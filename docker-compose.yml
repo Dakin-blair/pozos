@@ -1,0 +1,64 @@
+version: "3.8"
+
+services:
+  api:
+    image: student-list-api
+    container_name: student-list-api
+    volumes:
+      - ./simple_api/student_age.json:/data/student_age.json
+    ports:
+      - "5000:5000"
+    networks:
+      - pozos-network
+
+  website:
+    image: php:apache
+    container_name: student-list-website
+    environment:
+      - USERNAME=toto
+      - PASSWORD=python
+    volumes:
+      - ./website:/var/www/html
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - pozos-network
+
+  registry:
+    image: registry:2
+    container_name: docker-registry
+    ports:
+      - "5001:5000"
+    environment:
+      - REGISTRY_STORAGE_DELETE_ENABLED=true
+      - REGISTRY_HTTP_HEADERS_Access-Control-Allow-Origin=[http://localhost:8081]
+      - REGISTRY_HTTP_HEADERS_Access-Control-Allow-Methods=[HEAD,GET,OPTIONS,DELETE]
+      - REGISTRY_HTTP_HEADERS_Access-Control-Allow-Credentials=[true]
+      - REGISTRY_HTTP_HEADERS_Access-Control-Allow-Headers=[Authorization,Accept,Cache-Control]
+      - REGISTRY_HTTP_HEADERS_Access-Control-Expose-Headers=[Docker-Content-Digest]
+    volumes:
+      - registry-data:/var/lib/registry
+    networks:
+      - pozos-network
+
+  registry-ui:
+    image: joxit/docker-registry-ui:latest
+    container_name: registry-ui
+    ports:
+      - "8081:80"
+    environment:
+      - REGISTRY_TITLE=POZOS Docker Registry
+      - REGISTRY_URL=http://localhost:5001
+    depends_on:
+      - registry
+    networks:
+      - pozos-network
+
+networks:
+  pozos-network:
+    driver: bridge
+
+volumes:
+  registry-data:
