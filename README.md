@@ -56,12 +56,31 @@ docker push localhost:5001/student-list-api
 
 ![Interface du registre](images/04-registry-ui.png)
 
+## Pour aller plus loin
+
+L'énoncé proposait plusieurs pistes pour renchérir le projet. J'en ai implémenté quatre :
+
+**Build multistage** — Mon Dockerfile de l'API utilise maintenant deux stages : un premier stage (builder) installe gcc, build-essential et les paquets -dev nécessaires à la compilation de flask_simpleldap, un second stage ne garde que les paquets Python déjà compilés. L'image finale est plus légère (51.3 Mo de contenu propre, contre environ 205 Mo avant).
+
+**Healthcheck** — J'ai ajouté une instruction HEALTHCHECK dans le Dockerfile de l'API, qui vérifie toutes les 30 secondes que l'API répond correctement via une requête curl interne. Docker Desktop affiche alors le statut (healthy) du container.
+
+**Docker Swarm** — J'ai initialisé Swarm sur ma machine et créé un fichier docker-stack.yml séparé du docker-compose.yml, pour déployer les 4 services (api, website, registry, registry-ui) via docker stack deploy plutôt que docker compose.
+
+**Secrets Docker (mots de passe chiffrés)** — Plutôt que de mettre USERNAME et PASSWORD en clair dans la configuration, je les stocke comme des secrets Docker (docker secret create), qui ne nécessitent le mode Swarm. Pour ne pas modifier le code de l'application (index.php), j'utilise un entrypoint personnalisé dans docker-stack.yml qui lit les fichiers de secrets montés dans le container (/run/secrets/...) et les exporte en variables d'environnement avant de démarrer Apache.
+
+J'ai rencontré un bug intéressant en mettant ça en place : j'avais créé mes secrets avec `echo "toto" | docker secret create student_username -` depuis PowerShell, ce qui ajoute un retour à la ligne Windows (\r\n) à la fin de la valeur. La substitution de commande dans mon entrypoint supprimait bien le \n final, mais pas le \r, ce qui donnait un nom d'utilisateur `toto\r` au lieu de `toto` — l'API rejetait donc l'authentification (401 Unauthorized) même si les identifiants semblaient corrects. J'ai corrigé ça en recréant les secrets avec Set-Content -NoNewline, qui n'ajoute aucun caractère de fin de ligne.
+
+![Test de l'authentification via secrets Docker](images/05-swarm-secrets-test.png)
+
+**Registre privé sur un environnement distant** — Je n'ai pas implémenté ce point : il demande une vraie deuxième machine accessible sur le réseau (un VPS, un autre serveur), que je n'ai pas. En théorie, la démarche serait de déployer uniquement le service registry sur cette machine distante, d'exposer son port, puis de pousser/tirer les images depuis ma machine locale avec docker tag et docker push en ciblant l'adresse de cette machine plutôt que localhost.
+
 ## Structure du dépôt
 
 ```
 pozos/
 ├── README.md
 ├── docker-compose.yml
+├── docker-stack.yml
 ├── simple_api/
 │   ├── Dockerfile
 │   ├── student_age.py

@@ -1,0 +1,63 @@
+version: "3.8"
+
+services:
+  api:
+    image: student-list-api
+    volumes:
+      - ./simple_api/student_age.json:/data/student_age.json
+    ports:
+      - "5000:5000"
+    networks:
+      - pozos-network
+
+  website:
+    image: php:apache
+    secrets:
+      - student_username
+      - student_password
+    entrypoint: ["sh", "-c", "export USERNAME=$$(cat /run/secrets/student_username) && export PASSWORD=$$(cat /run/secrets/student_password) && docker-php-entrypoint apache2-foreground"]
+    volumes:
+      - ./website:/var/www/html
+    ports:
+      - "80:80"
+    networks:
+      - pozos-network
+
+  registry:
+    image: registry:2
+    ports:
+      - "5001:5000"
+    environment:
+      - REGISTRY_STORAGE_DELETE_ENABLED=true
+      - REGISTRY_HTTP_HEADERS_Access-Control-Allow-Origin=[http://localhost:8081]
+      - REGISTRY_HTTP_HEADERS_Access-Control-Allow-Methods=[HEAD,GET,OPTIONS,DELETE]
+      - REGISTRY_HTTP_HEADERS_Access-Control-Allow-Credentials=[true]
+      - REGISTRY_HTTP_HEADERS_Access-Control-Allow-Headers=[Authorization,Accept,Cache-Control]
+      - REGISTRY_HTTP_HEADERS_Access-Control-Expose-Headers=[Docker-Content-Digest]
+    volumes:
+      - registry-data:/var/lib/registry
+    networks:
+      - pozos-network
+
+  registry-ui:
+    image: joxit/docker-registry-ui:latest
+    ports:
+      - "8081:80"
+    environment:
+      - REGISTRY_TITLE=POZOS Docker Registry
+      - REGISTRY_URL=http://localhost:5001
+    networks:
+      - pozos-network
+
+networks:
+  pozos-network:
+    driver: overlay
+
+volumes:
+  registry-data:
+
+secrets:
+  student_username:
+    external: true
+  student_password:
+    external: true
